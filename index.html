@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Website Builder</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <style>
+        /* CRITICAL FIX: Mobile View Setup */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #0f172a; /* Slate 900 */
+            color: #e2e8f0;
+            min-height: 100dvh; /* Dynamic Viewport Height */
+            height: 100dvh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #1e293b; 
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #475569; 
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #64748b; 
+        }
+
+        /* Loader Animation */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Syntax Highlighting Mockup */
+        .code-block {
+            font-family: 'Courier New', Courier, monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+    </style>
+</head>
+<body class="text-sm">
+
+    <div id="app" class="flex flex-1 w-full h-full overflow-hidden relative">
+
+        <aside class="w-64 bg-slate-900 border-r border-slate-700 flex flex-col flex-shrink-0 transition-all duration-300 absolute md:relative z-20 h-full transform -translate-x-full md:translate-x-0" id="sidebar">
+            
+            <div class="p-4 border-b border-slate-700">
+                <button onclick="app.newProject()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-4 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                    <i class="fas fa-plus"></i> New Project
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-2 space-y-1" id="project-list">
+                </div>
+
+            <div class="p-4 border-t border-slate-700 bg-slate-900">
+                <button onclick="app.toggleSettings()" class="w-full flex items-center gap-3 text-slate-400 hover:text-white p-2 rounded hover:bg-slate-800 transition-colors">
+                    <i class="fas fa-cog fa-lg"></i>
+                    <span>Settings</span>
+                </button>
+            </div>
+        </aside>
+
+        <main class="flex-1 flex flex-col min-w-0 bg-slate-800 relative">
+            
+            <button onclick="app.toggleSidebar()" class="md:hidden absolute top-3 left-3 z-30 text-slate-400 p-2 bg-slate-800 rounded border border-slate-700">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <header class="h-14 bg-slate-900 border-b border-slate-700 flex items-center justify-between px-4 flex-shrink-0">
+                
+                <div class="flex items-center gap-2 pl-10 md:pl-0">
+                    <div class="w-3 h-3 rounded-full bg-red-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+                    <div class="w-3 h-3 rounded-full bg-green-500"></div>
+                </div>
+
+                <div class="flex bg-slate-800 rounded-lg p-1 border border-slate-700">
+                    <button onclick="app.setView('preview')" id="btn-preview" class="px-4 py-1.5 rounded-md text-xs font-medium bg-slate-600 text-white shadow-sm transition-all">
+                        <i class="fas fa-eye mr-1"></i> Preview
+                    </button>
+                    <button onclick="app.setView('code')" id="btn-code" class="px-4 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-white transition-all">
+                        <i class="fas fa-code mr-1"></i> Code
+                    </button>
+                </div>
+
+                <button onclick="app.downloadHTML()" class="text-slate-400 hover:text-green-400 transition-colors" title="Download index.html">
+                    <i class="fas fa-download fa-lg"></i>
+                </button>
+            </header>
+
+            <div class="flex-1 overflow-hidden relative bg-gray-100">
+                
+                <div id="view-preview" class="w-full h-full block">
+                    <iframe id="preview-frame" class="w-full h-full border-none bg-white" sandbox="allow-scripts allow-modals allow-same-origin"></iframe>
+                </div>
+
+                <div id="view-code" class="w-full h-full hidden bg-slate-900 overflow-auto p-4">
+                    <pre><code id="code-display" class="code-block text-green-400 text-sm"></code></pre>
+                </div>
+
+                <div id="loader-overlay" class="absolute inset-0 bg-slate-900/80 flex flex-col items-center justify-center z-50 hidden">
+                    <div class="loader mb-3"></div>
+                    <p class="text-blue-400 font-medium animate-pulse">AI is coding...</p>
+                </div>
+            </div>
+
+            <footer class="bg-slate-900 border-t border-slate-700 p-4 flex-shrink-0">
+                <div class="max-w-4xl mx-auto flex gap-3 relative">
+                    <textarea 
+                        id="user-input" 
+                        class="w-full bg-slate-800 text-white border border-slate-600 rounded-xl px-4 py-3 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-none h-14"
+                        placeholder="Describe your website (e.g., 'A landing page for a coffee shop with a hero section')..."
+                        onkeydown="if(event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); app.generate(); }"
+                    ></textarea>
+                    
+                    <button onclick="app.generate()" class="bg-blue-600 hover:bg-blue-500 text-white rounded-xl px-5 flex items-center justify-center transition-colors flex-shrink-0">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+            </footer>
+        </main>
+
+        <div id="settings-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+            <div class="bg-slate-800 border border-slate-600 rounded-xl w-full max-w-md shadow-2xl transform transition-all scale-100">
+                <div class="p-6">
+                    <h2 class="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                        <i class="fas fa-cog text-slate-400"></i> Settings
+                    </h2>
+                    
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">API URL</label>
+                            <input type="text" id="set-url" class="w-full bg-slate-900 border border-slate-700 rounded p-2.5 text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">API Key</label>
+                            <input type="password" id="set-key" class="w-full bg-slate-900 border border-slate-700 rounded p-2.5 text-white focus:border-blue-500 focus:outline-none" placeholder="sk-or-...">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-400 uppercase mb-1">Model ID</label>
+                            <input type="text" id="set-model" class="w-full bg-slate-900 border border-slate-700 rounded p-2.5 text-white focus:border-blue-500 focus:outline-none">
+                        </div>
+                    </div>
+
+                    <div class="mt-8 flex justify-end gap-3">
+                        <button onclick="app.toggleSettings()" class="px-4 py-2 text-slate-300 hover:text-white hover:bg-slate-700 rounded transition-colors">Cancel</button>
+                        <button onclick="app.saveSettings()" class="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded font-medium shadow-lg transition-colors">Save Settings</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- CONSTANTS ---
+        const SYSTEM_PROMPT = "You are a web developer. Output ONLY raw HTML code including CSS within <style> tags. Do not output markdown, explanations, or code fences. Start with <!DOCTYPE html>.";
+        
+        // --- STATE MANAGEMENT ---
+        const app = {
+            state: {
+                projects: [],
+                currentProjectId: null,
+                settings: {
+                    apiUrl: "https://openrouter.ai/api/v1/chat/completions",
+                    apiKey: "",
+                    model: "deepseek/deepseek-r1:free"
+                }
+            },
+
+            // --- INITIALIZATION ---
+            init() {
+                this.loadLocalStorage();
+                this.renderProjectList();
+                
+                // Load settings into inputs
+                document.getElementById('set-url').value = this.state.settings.apiUrl;
+                document.getElementById('set-key').value = this.state.settings.apiKey;
+                document.getElementById('set-model').value = this.state.settings.model;
+
+                if (this.state.projects.length === 0) {
+                    this.newProject();
+                } else {
+                    // Load most recent or first
+                    this.loadProject(this.state.projects[0].id);
+                }
+            },
+
+            // --- LOCAL STORAGE ---
+            saveData() {
+                localStorage.setItem('aibuilder_data', JSON.stringify(this.state));
+            },
+
+            loadLocalStorage() {
+                const data = localStorage.getItem('aibuilder_data');
+                if (data) {
+                    const parsed = JSON.parse(data);
+                    // Merge to ensure structure integrity
+                    this.state.projects = parsed.projects || [];
+                    if(parsed.settings) {
+                        this.state.settings = { ...this.state.settings, ...parsed.settings };
+                    }
+                }
+            },
+
+            // --- PROJECT MANAGEMENT ---
+            newProject() {
+                const id = Date.now().toString();
+                const newProj = {
+                    id: id,
+                    name: `Project ${this.state.projects.length + 1}`,
+                    html: '<!DOCTYPE html><html><body style="display:flex;justify-content:center;align-items:center;height:100vh;font-family:sans-serif;color:#666;"><h1>Ready to build...</h1></body></html>',
+                    history: [] // Chat history for context
+                };
+                this.state.projects.unshift(newProj);
+                this.loadProject(id);
+                this.saveData();
+                this.renderProjectList();
+                
+                // Mobile: close sidebar on new project
+                document.getElementById('sidebar').classList.add('-translate-x-full');
+            },
+
+            loadProject(id) {
+                this.state.currentProjectId = id;
+                const proj = this.state.projects.find(p => p.id === id);
+                if (!proj) return;
+
+                // Update UI
+                this.updatePreview(proj.html);
+                this.renderProjectList();
+            },
+
+            getCurrentProject() {
+                return this.state.projects.find(p => p.id === this.state.currentProjectId);
+            },
+
+            updatePreview(html) {
+                const iframe = document.getElementById('preview-frame');
+                const doc = iframe.contentWindow.document;
+                doc.open();
+                doc.write(html);
+                doc.close();
+
+                // Update code view
+                document.getElementById('code-display').textContent = html;
+            },
+
+            // --- API INTERACTION (CRITICAL LOGIC) ---
+            async generate() {
+                const inputEl = document.getElementById('user-input');
+                const prompt = inputEl.value.trim();
+                if (!prompt) return;
+
+                const proj = this.getCurrentProject();
+                
+                // Check API Key
+                if (!this.state.settings.apiKey) {
+                    alert("Please enter your OpenRouter API Key in Settings.");
+                    this.toggleSettings();
+                    return;
+                }
+
+                // UI State: Loading
+                inputEl.value = "";
+                document.getElementById('loader-overlay').classList.remove('hidden');
+
+                try {
+                    // Prepare Messages
+                    const messages = [
+                        { role: "system", content: SYSTEM_PROMPT },
+                        ...proj.history.slice(-4), // Limit context window
+                        { role: "user", content: `Current HTML: ${proj.html}\n\nRequest: ${prompt}` }
+                    ];
+
+                    // CRITICAL FIX 1: URL & FIX 2: Anti-Crash Logic
+                    const response = await fetch(this.state.settings.apiUrl, {
+                        method: "POST",
+                        headers: {
+                            "Content-Type": "application/json",
+                            "Authorization": `Bearer ${this.state.settings.apiKey}`,
+                            "HTTP-Referer": window.location.href, // OpenRouter requirement
+                            "X-Title": "AI Website Builder"
+                        },
+                        body: JSON.stringify({
+                            model: this.state.settings.model,
+                            messages: messages
+                        })
+                    });
+
+                    // CRITICAL FIX 2: Text first, Check OK, then Parse
+                    const rawText = await response.text();
+                    
+                    if (!response.ok) {
+                        alert(`API Error: ${rawText}`);
+                        document.getElementById('loader-overlay').classList.add('hidden');
+                        return; // STOP
+                    }
+
+                    const json = JSON.parse(rawText);
+                    
+                    // Handle Deepseek/OpenRouter response structure
+                    let content = json.choices?.[0]?.message?.content || "";
+
+                    if (!content) {
+                        throw new Error("No content received from API");
+                    }
+
+                    // Extract HTML (Deepseek R1 sometimes adds <think> tags or markdown)
+                    // We look for the first <!DOCTYPE and the last </html>
+                    const htmlMatch = content.match(/<!DOCTYPE html>[\s\S]*<\/html>/i);
+                    let cleanHtml = htmlMatch ? htmlMatch[0] : content;
+
+                    // Remove markdown fences if they exist around the HTML
+                    cleanHtml = cleanHtml.replace(/^```html/, '').replace(/```$/, '');
+
+                    // Update State
+                    proj.html = cleanHtml;
+                    proj.history.push({ role: "user", content: prompt });
+                    proj.history.push({ role: "assistant", content: cleanHtml }); // Save context
+                    
+                    // Save and Render
+                    this.saveData();
+                    this.updatePreview(cleanHtml);
+
+                } catch (e) {
+                    alert("Generation Failed: " + e.message);
+                    console.error(e);
+                } finally {
+                    document.getElementById('loader-overlay').classList.add('hidden');
+                }
+            },
+
+            // --- UI HANDLERS ---
+            renderProjectList() {
+                const list = document.getElementById('project-list');
+                list.innerHTML = '';
+                
+                this.state.projects.forEach(p => {
+                    const isActive = p.id === this.state.currentProjectId;
+                    const el = document.createElement('div');
+                    el.className = `p-3 mx-2 rounded cursor-pointer text-sm truncate transition-colors ${isActive ? 'bg-slate-700 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`;
+                    el.textContent = p.name;
+                    el.onclick = () => {
+                        this.loadProject(p.id);
+                        // Mobile: close sidebar
+                        document.getElementById('sidebar').classList.add('-translate-x-full');
+                    };
+                    list.appendChild(el);
+                });
+            },
+
+            toggleSettings() {
+                const modal = document.getElementById('settings-modal');
+                modal.classList.toggle('hidden');
+            },
+
+            saveSettings() {
+                const url = document.getElementById('set-url').value.trim();
+                const key = document.getElementById('set-key').value.trim();
+                const model = document.getElementById('set-model').value.trim();
+
+                if (!url || !model) {
+                    alert("URL and Model are required.");
+                    return;
+                }
+
+                this.state.settings = { apiUrl: url, apiKey: key, model: model };
+                this.saveData();
+                this.toggleSettings();
+            },
+
+            setView(mode) {
+                const previewEl = document.getElementById('view-preview');
+                const codeEl = document.getElementById('view-code');
+                const btnPrev = document.getElementById('btn-preview');
+                const btnCode = document.getElementById('btn-code');
+
+                if (mode === 'preview') {
+                    previewEl.classList.remove('hidden');
+                    codeEl.classList.add('hidden');
+                    
+                    btnPrev.className = "px-4 py-1.5 rounded-md text-xs font-medium bg-slate-600 text-white shadow-sm transition-all";
+                    btnCode.className = "px-4 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-white transition-all";
+                } else {
+                    previewEl.classList.add('hidden');
+                    codeEl.classList.remove('hidden');
+                    
+                    btnPrev.className = "px-4 py-1.5 rounded-md text-xs font-medium text-slate-400 hover:text-white transition-all";
+                    btnCode.className = "px-4 py-1.5 rounded-md text-xs font-medium bg-slate-600 text-white shadow-sm transition-all";
+                }
+            },
+
+            downloadHTML() {
+                const proj = this.getCurrentProject();
+                if(!proj) return;
+                
+                const blob = new Blob([proj.html], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = 'index.html';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            },
+            
+            toggleSidebar() {
+                const sb = document.getElementById('sidebar');
+                if (sb.classList.contains('-translate-x-full')) {
+                    sb.classList.remove('-translate-x-full');
+                } else {
+                    sb.classList.add('-translate-x-full');
+                }
+            }
+        };
+
+        // Start App
+        window.addEventListener('DOMContentLoaded', () => app.init());
+    </script>
+</body>
+</html>
